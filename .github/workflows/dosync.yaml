@@ -1,91 +1,49 @@
-name: Do Tools Sync For Abldg
+name: Docker-Destkop-Installer
 
 on:
   workflow_dispatch:
   #  inputs:
   #    binvern:
-  #      description: '指定版本号(不填则使用最新版本)'
+  #      description: '指定Zig版本号(如0.15.2,不填则使用最新版本)'
   #      required: false
   #      type: string
-  # schedule:
-  #   - cron: '0 3 * * *'  # 已屏蔽,不再定时执行
+  #schedule:
+  #  - cron: '0 3 * * *'  # 每天凌晨3点自动执行(使用最新版本)
 
 permissions:
   contents: write
 
-# 并发控制:同一时间只允许一个同步任务运行,避免重复发布冲突
-concurrency:
-  group: full-sync
-  cancel-in-progress: false
-
-env:
-  DOWNLOAD_JOBS: 8          # 并行下载数
-
 jobs:
   sync_binaries:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
     steps:
       - name: Generate Date-Based Tag
         run: |
-          # 生成 YYYY.MM.DD 格式的日期标签
-          echo "VTAG=v$(date +"%Y.%m.%d")" >> "$GITHUB_ENV"
+          # 生成 YYYY.MM.DD 格式的日期标签,并追加到环境变量中
+          echo "VTAG=v$(date +"%Y.%m.%d")" >> $GITHUB_ENV
           echo "生成的发布标签为: ${{env.VTAG}}"
 
       - name: 拉取仓库代码
         uses: actions/checkout@v7
 
       - name: Download installers
-        env:
-          JOBS: ${{ env.DOWNLOAD_JOBS }}
         run: |
-          set -euo pipefail
           mkdir -p dist
+          curl -fsSLo dist/linux.sh "https://get.docker.com"
+          curl -fsSLo dist/docker_desktop_installer_windows_amd64.exe "https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe"
+          curl -fsSLo dist/docker_desktop_installer_windows_arm64.exe "https://desktop.docker.com/win/main/arm64/Docker%20Desktop%20Installer.exe"
+          curl -fsSLo dist/docker_desktop_installer_linux_amd64.deb   "https://desktop.docker.com/linux/main/amd64/docker-desktop-amd64.deb"
+          curl -fsSLo dist/docker_desktop_installer_linux_amd64.rpm   "https://desktop.docker.com/linux/main/amd64/docker-desktop-x86_64.rpm"
+          curl -fsSLo dist/docker_desktop_installer_darwin_amd64.dmg  "https://desktop.docker.com/mac/main/amd64/Docker.dmg"
+          curl -fsSLo dist/docker_desktop_installer_darwin_arm64.dmg  "https://desktop.docker.com/mac/main/arm64/Docker.dmg"
 
-          fetch_one() {
-            local url="$1" out="$2"
-            for i in 1 2 3; do
-              if curl -4fL --retry 3 --retry-all-errors --retry-delay 2 \
-                    --connect-timeout 15 --max-time 1800 \
-                    -o "dist/${out}" "${url}"; then
-                # 基本完整性检查: 文件非空
-                if [[ -s "dist/${out}" ]]; then
-                  echo "成功: ${out}"
-                  return 0
-                fi
-                echo "::warning::下载内容为空: ${out}"
-              fi
-              sleep $((i * 3))
-            done
-            echo "::error::下载失败: ${out} <- ${url}"
-            return 1
-          }
-          export -f fetch_one
-
-          # 下载清单: "<url>  <输出文件名>",任一失败即整体失败
-          printf '%s\n' \
-            "https://get.docker.com linux.sh" \
-            "https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe docker_desktop_installer_windows_amd64.exe" \
-            "https://desktop.docker.com/win/main/arm64/Docker%20Desktop%20Installer.exe docker_desktop_installer_windows_arm64.exe" \
-            "https://desktop.docker.com/linux/main/amd64/docker-desktop-amd64.deb docker_desktop_installer_linux_amd64.deb" \
-            "https://desktop.docker.com/linux/main/amd64/docker-desktop-x86_64.rpm docker_desktop_installer_linux_amd64.rpm" \
-            "https://desktop.docker.com/mac/main/amd64/Docker.dmg docker_desktop_installer_darwin_amd64.dmg" \
-            "https://desktop.docker.com/mac/main/arm64/Docker.dmg docker_desktop_installer_darwin_arm64.dmg" \
-            > "${RUNNER_TEMP}/manifest.txt"
-
-          xargs -P "${JOBS}" -n 2 bash -c 'fetch_one "$@"' _ < "${RUNNER_TEMP}/manifest.txt"
-          echo "下载完成,文件数: $(find dist -type f | wc -l)"
-
-      - name: 发布到 Releases
-        if: ${{ hashFiles('dist/*') != '' }}
+      - name: Release
         uses: softprops/action-gh-release@v3
         with:
-          files: dist/*
-          tag_name: "${{env.VTAG}}"
+          overwrite_files: false  # 不覆盖已有版本(避免重复发布同一版本)
+          tag_name: ${{env.VTAG}}
           name: "Daily Build - ${{env.VTAG}}"
           body: |
             这是一个自动生成的每日构建发布。
             - 构建时间: ${{env.VTAG}}
-            - 同步任务: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          overwrite_files: false  # 不覆盖已有版本(避免重复发布同一日期)
-          fail_on_unmatched_files: true
+          files: dist/*

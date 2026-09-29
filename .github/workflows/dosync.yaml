@@ -1,8 +1,9 @@
 name: Docker-Destkop-Installer
 
-# 共享同步逻辑位于私有仓库 shared_actions/sync_docker_desktop.yaml(组合 action)
-# 请将下方 OWNER 替换为你的 GitHub 组织/用户名
+# 共享同步逻辑位于私有仓库 shared_actions/sync_docker_desktop.yaml(组合 action,已钉 commit SHA 对应 v1)
 on:
+  # schedule:
+  #   - cron: '0 3 * * *'  # 每天凌晨3点自动执行(使用最新版本,已屏蔽)
   workflow_dispatch:
 
 permissions:
@@ -18,4 +19,4 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: 同步 Docker Desktop 安装包
-        uses: abldgsync/shared_actions/sync_docker_desktop.yaml@v1
+        uses: abldgsync/shared_actions/sync_docker_desktop.yaml@ebf207c2b4c8709aef87571787eb50242b683754

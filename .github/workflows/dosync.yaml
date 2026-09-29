@@ -1,6 +1,6 @@
 name: Docker-Destkop-Installer
 
-# 共享同步逻辑位于公共(Public)仓库 shared_actions/sync_docker_desktop.yaml(组合 action,已钉 commit SHA)
+# 共享同步逻辑位于公共(Public)仓库 .sacts/sync_docker_desktop.yaml(组合 action,已钉 commit SHA)
 on:
   # schedule:
   #   - cron: '0 3 * * *'  # 每天凌晨3点自动执行(使用最新版本,已屏蔽)
@@ -19,4 +19,4 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: 同步 Docker Desktop 安装包
-        uses: abldgsync/shared_actions/sync_docker_desktop@main
+        uses: abldgsync/.sacts/sync_docker_desktop@main

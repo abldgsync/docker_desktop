@@ -1,49 +1,21 @@
 name: Docker-Destkop-Installer
 
+# 共享同步逻辑位于私有仓库 shared_actions/sync_docker_desktop.yaml(组合 action)
+# 请将下方 OWNER 替换为你的 GitHub 组织/用户名
 on:
   workflow_dispatch:
-  #  inputs:
-  #    binvern:
-  #      description: '指定Zig版本号(如0.15.2,不填则使用最新版本)'
-  #      required: false
-  #      type: string
-  #schedule:
-  #  - cron: '0 3 * * *'  # 每天凌晨3点自动执行(使用最新版本)
 
 permissions:
   contents: write
 
+concurrency:
+  group: full-sync
+  cancel-in-progress: false
+
 jobs:
   sync_binaries:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - name: Generate Date-Based Tag
-        run: |
-          # 生成 YYYY.MM.DD 格式的日期标签,并追加到环境变量中
-          echo "VTAG=v$(date +"%Y.%m.%d")" >> $GITHUB_ENV
-          echo "生成的发布标签为: ${{env.VTAG}}"
-
-      - name: 拉取仓库代码
-        uses: actions/checkout@v7
-
-      - name: Download installers
-        run: |
-          mkdir -p dist
-          curl -fsSLo dist/linux.sh "https://get.docker.com"
-          curl -fsSLo dist/docker_desktop_installer_windows_amd64.exe "https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe"
-          curl -fsSLo dist/docker_desktop_installer_windows_arm64.exe "https://desktop.docker.com/win/main/arm64/Docker%20Desktop%20Installer.exe"
-          curl -fsSLo dist/docker_desktop_installer_linux_amd64.deb   "https://desktop.docker.com/linux/main/amd64/docker-desktop-amd64.deb"
-          curl -fsSLo dist/docker_desktop_installer_linux_amd64.rpm   "https://desktop.docker.com/linux/main/amd64/docker-desktop-x86_64.rpm"
-          curl -fsSLo dist/docker_desktop_installer_darwin_amd64.dmg  "https://desktop.docker.com/mac/main/amd64/Docker.dmg"
-          curl -fsSLo dist/docker_desktop_installer_darwin_arm64.dmg  "https://desktop.docker.com/mac/main/arm64/Docker.dmg"
-
-      - name: Release
-        uses: softprops/action-gh-release@v3
-        with:
-          overwrite_files: false  # 不覆盖已有版本(避免重复发布同一版本)
-          tag_name: ${{env.VTAG}}
-          name: "Daily Build - ${{env.VTAG}}"
-          body: |
-            这是一个自动生成的每日构建发布。
-            - 构建时间: ${{env.VTAG}}
-          files: dist/*
+      - name: 同步 Docker Desktop 安装包
+        uses: abldgsync/shared_actions/sync_docker_desktop.yaml@v1
